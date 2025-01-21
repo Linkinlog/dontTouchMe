@@ -9,10 +9,12 @@ wip
 - [ ] Add a changelog
 ## Code
 ### MVP
-- [ ] Connect to users wifi
+- [x] Connect to users wifi
 - [x] Read sensor data
-- [ ] If sensor data has changed(i.e. the sensor has moved) push a notification to discord
+- [x] If sensor data has changed(i.e. the sensor has moved) push a notification to discord
+- [ ] Blink LED while booting
 ### Beyond
+- [ ] Figure out certs so we can speed up the HTTPS
 - [ ] Add a web interface to:
     - [ ] View sensor data
     - [ ] Change the wifi network

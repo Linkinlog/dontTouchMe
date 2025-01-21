@@ -16,4 +16,10 @@ menu "Wifi Configuration"
         default 5
         help
             Maximum number of retry to connect to WiFi.
+    config HTTP_ENDPOINT
+        string "HTTP Endpoint"
+        default "google.com"
+    config HTTP_PATH
+        string "HTTP Path"
+        default "/"
 endmenu
