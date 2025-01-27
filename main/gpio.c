@@ -43,20 +43,13 @@ int read_adc(adc_unit_t unit, adc_channel_t channel) {
   return oneshot_read(handle, channel, &raw);
 }
 
-int applyEMAFiltering(int new_value, adc_config_t *config) {
-  return (config->alpha * new_value) + ((1.0 - config->alpha) * config->value);
-}
-
 int read_adc_filtered(adc_config_t *config) {
   int sum = 0;
   for (int i = 0; i < config->samples; i++) {
     sum += read_adc(config->unit, config->channel);
     vTaskDelay(pdMS_TO_TICKS(10));
   }
-  int new_value = sum / config->samples;
-
-  config->value = applyEMAFiltering(new_value, config);
-  return config->value;
+  return sum / config->samples;
 }
 
 void blink_led(gpio_num_t gpio_num) {

@@ -9,7 +9,6 @@ void gpio_init_led(gpio_num_t gpio_num);
 typedef struct {
   int value;
   int samples; // Number of samples to average
-  float alpha; // EMA smoothing factor (0-1)
   adc_unit_t unit;
   adc_channel_t channel;
 } adc_config_t;
