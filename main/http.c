@@ -3,11 +3,13 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_tls.h"
+#include "freertos/idf_additions.h"
 #include <sys/param.h>
 
 #define HTTP_ENDPOINT CONFIG_HTTP_ENDPOINT
 #define HTTP_PATH CONFIG_HTTP_PATH
 #define MAX_HTTP_OUTPUT_BUFFER 2048
+#define HTTP_QUEUE_SIZE 10
 
 static const char *TAG = "HTTP_CLIENT";
 
@@ -93,7 +95,7 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt) {
   return ESP_OK;
 }
 
-void post_data(void) {
+void post_data(http_queue_item_t *item) {
   esp_http_client_config_t config = {
       .url = "https://" HTTP_ENDPOINT HTTP_PATH,
       .event_handler = http_event_handler,
@@ -103,16 +105,22 @@ void post_data(void) {
       .timeout_ms = 5000,
   };
   esp_http_client_handle_t client = esp_http_client_init(&config);
-  esp_err_t err;
-  const char *post_data = "{\"content\":\"I've been touched!!\"}";
+  char post_data[64];
+  snprintf(post_data, sizeof(post_data),
+           "{\"content\":\"I've been touched!!, timestamp :%lld\"}",
+           item->timestamp);
+
   esp_http_client_set_method(client, HTTP_METHOD_POST);
   esp_http_client_set_header(client, "Content-Type", "application/json");
   esp_http_client_set_post_field(client, post_data, strlen(post_data));
+
+  esp_err_t err;
   while (1) {
     err = esp_http_client_perform(client);
     if (err != ESP_ERR_HTTP_EAGAIN) {
       break;
     }
+    vTaskDelay(100 / portTICK_PERIOD_MS);
   }
   if (err == ESP_OK) {
     ESP_LOGI(TAG, "HTTPS Status = %d, content_length = %" PRId64,
@@ -122,4 +130,28 @@ void post_data(void) {
     ESP_LOGE(TAG, "Error perform http request %s", esp_err_to_name(err));
   }
   esp_http_client_cleanup(client);
+}
+
+static QueueHandle_t http_queue = NULL;
+
+void http_task_handler(void *pvParameters) {
+  http_queue_item_t item;
+  while (1) {
+    if (xQueueReceive(http_queue, &item, portMAX_DELAY) == pdTRUE) {
+      post_data(&item);
+    }
+    vTaskDelay(10000 / portTICK_PERIOD_MS);
+  }
+}
+
+void http_task_init(void) {
+  http_queue = xQueueCreate(HTTP_QUEUE_SIZE, sizeof(http_queue_item_t));
+
+  xTaskCreate(http_task_handler, "http_task_handler", 4096, NULL, 5, NULL);
+}
+
+void http_task_send(http_queue_item_t *item) {
+  if (xQueueSend(http_queue, item, 0) != pdTRUE) {
+    ESP_LOGE(TAG, "Failed to send item to http queue");
+  }
 }

@@ -28,26 +28,42 @@ void nvs_init(void) {
 }
 
 void app_main(void) {
+  ESP_LOGI(TAG, "ESP_NVS");
   nvs_init();
-  configure_led(led_gpio);
-
-  blink_led(led_gpio);
-
   ESP_LOGI(TAG, "ESP_WIFI");
   wifi_init_sta();
+  ESP_LOGI(TAG, "ESP_HTTP");
+  http_task_init();
+  ESP_LOGI(TAG, "ESP_GPIO");
+  gpio_init_led(led_gpio);
+
+  // blink_led(led_gpio);
 
   int last_raw = 0;
   time_t now = time(NULL);
   bool ran_once = false;
 
+  adc_config_t config = {
+    .value = 0,
+    .samples = 10,
+    .alpha = 0.1,
+    .unit = unit,
+    .channel = channel,
+  };
+
   while (1) {
-    int raw = read_adc(unit, channel);
+    int raw = read_adc_filtered(&config);
     if (raw != last_raw) {
       time_t elapsed = time(NULL) - now;
       if (!ran_once || elapsed > 5) {
         ran_once = true;
         ESP_LOGI(TAG, "ADC[%d]: %d", channel, raw);
-        post_data();
+
+        http_queue_item_t item = {
+          .timestamp = time(NULL),
+        };
+
+        http_task_send(&item);
       }
       last_raw = raw;
       now = time(NULL);

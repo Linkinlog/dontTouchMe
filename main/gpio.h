@@ -3,9 +3,17 @@
 #include "hal/adc_types.h"
 #include "soc/gpio_num.h"
 
-int read_adc(adc_unit_t unit, adc_channel_t channel);
-
 void blink_led(gpio_num_t gpio_num);
-void configure_led(gpio_num_t gpio_num);
+void gpio_init_led(gpio_num_t gpio_num);
+
+typedef struct {
+  int value;
+  int samples; // Number of samples to average
+  float alpha; // EMA smoothing factor (0-1)
+  adc_unit_t unit;
+  adc_channel_t channel;
+} adc_config_t;
+
+int read_adc_filtered(adc_config_t *config);
 
 #endif
