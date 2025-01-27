@@ -32,10 +32,12 @@ void app_main(void) {
   nvs_init();
   ESP_LOGI(TAG, "ESP_WIFI");
   wifi_init_sta();
-  ESP_LOGI(TAG, "ESP_HTTP");
-  http_task_init();
+  ESP_LOGI(TAG, "ESP_POOL");
+  connection_pool_init();
   ESP_LOGI(TAG, "ESP_GPIO");
   gpio_init_led(led_gpio);
+  ESP_LOGI(TAG, "ESP_HTTP");
+  http_queue_init();
 
   // blink_led(led_gpio);
 

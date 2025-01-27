@@ -10,8 +10,11 @@
 #define HTTP_PATH CONFIG_HTTP_PATH
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 #define HTTP_QUEUE_SIZE 10
+#define MAX_CONNECTIONS 3
+#define CONNECTION_TIMEOUT_MS 5000
 
 static const char *TAG = "HTTP_CLIENT";
+static connection_pool_t pool = {0};
 
 esp_err_t http_event_handler(esp_http_client_event_t *evt) {
   static char *output_buffer;
@@ -95,16 +98,76 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt) {
   return ESP_OK;
 }
 
+void connection_pool_init(void) {
+  pool.lock = xSemaphoreCreateMutex();
+
+  for (int i = 0; i < MAX_CONNECTIONS; i++) {
+    esp_http_client_config_t config = {
+        .url = "https://" HTTP_ENDPOINT HTTP_PATH,
+        .event_handler = http_event_handler,
+        .skip_cert_common_name_check = true,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .disable_auto_redirect = true,
+        .timeout_ms = 5000,
+    };
+
+    pool.connections[i].client = esp_http_client_init(&config);
+    pool.connections[i].in_use = false;
+    pool.connections[i].last_used = 0;
+  }
+}
+
+esp_http_client_handle_t get_connection(void) {
+  if (xSemaphoreTake(pool.lock, portMAX_DELAY) != pdTRUE) {
+    return NULL;
+  }
+
+  time_t now = time(NULL);
+  http_connection_t *best_connection = NULL;
+
+  for (int i = 0; i < MAX_CONNECTIONS; i++) {
+    if (!pool.connections[i].in_use) {
+      best_connection = &pool.connections[i];
+      break;
+    }
+  }
+
+  if (!best_connection) {
+    for (int i = 0; i < MAX_CONNECTIONS; i++) {
+      if (!pool.connections[i].last_used * 1000 > CONNECTION_TIMEOUT_MS) {
+        best_connection = &pool.connections[i];
+        break;
+      }
+    }
+  }
+
+  if (best_connection) {
+    best_connection->in_use = true;
+    best_connection->last_used = now;
+  }
+
+  xSemaphoreGive(pool.lock);
+  return best_connection ? best_connection->client : NULL;
+}
+
+void release_connection(esp_http_client_handle_t client) {
+  if (xSemaphoreTake(pool.lock, portMAX_DELAY) != pdTRUE) {
+    return;
+  }
+
+  for (int i = 0; i < MAX_CONNECTIONS; i++) {
+    if (pool.connections[i].client == client) {
+      pool.connections[i].in_use = false;
+      pool.connections[i].last_used = time(NULL);
+      break;
+    }
+  }
+
+  xSemaphoreGive(pool.lock);
+}
+
 void post_data(http_queue_item_t *item) {
-  esp_http_client_config_t config = {
-      .url = "https://" HTTP_ENDPOINT HTTP_PATH,
-      .event_handler = http_event_handler,
-      .skip_cert_common_name_check = true,
-      .crt_bundle_attach = esp_crt_bundle_attach,
-      .disable_auto_redirect = true,
-      .timeout_ms = 5000,
-  };
-  esp_http_client_handle_t client = esp_http_client_init(&config);
+  esp_http_client_handle_t client = get_connection();
   char post_data[64];
   snprintf(post_data, sizeof(post_data),
            "{\"content\":\"I've been touched!!, timestamp :%lld\"}",
@@ -144,7 +207,7 @@ void http_task_handler(void *pvParameters) {
   }
 }
 
-void http_task_init(void) {
+void http_queue_init(void) {
   http_queue = xQueueCreate(HTTP_QUEUE_SIZE, sizeof(http_queue_item_t));
 
   xTaskCreate(http_task_handler, "http_task_handler", 4096, NULL, 5, NULL);

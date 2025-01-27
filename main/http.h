@@ -2,12 +2,26 @@
 #define HTTP_H
 
 #include <time.h>
+#include "esp_http_client.h"
+#include "freertos/idf_additions.h"
 
 typedef struct {
     time_t timestamp;
 } http_queue_item_t;
 
-void http_task_init(void);
+typedef struct {
+    esp_http_client_handle_t client;
+    time_t last_used;
+    bool in_use;
+} http_connection_t;
+
+typedef struct {
+    http_connection_t *connections;
+    SemaphoreHandle_t lock;
+} connection_pool_t;
+
+void http_queue_init(void);
 void http_task_send(http_queue_item_t *item);
+void connection_pool_init(void);
 
 #endif
