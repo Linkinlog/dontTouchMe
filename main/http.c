@@ -5,13 +5,18 @@
 #include "esp_tls.h"
 #include "freertos/idf_additions.h"
 #include <sys/param.h>
+#include <time.h>
 
 #define HTTP_ENDPOINT CONFIG_HTTP_ENDPOINT
 #define HTTP_PATH CONFIG_HTTP_PATH
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 #define HTTP_QUEUE_SIZE 10
+#define MAX_CONNECTIONS 3
+#define CONNECTION_TIMEOUT_MS 60000
 
 static const char *TAG = "HTTP_CLIENT";
+static http_connection_t connection_pool[MAX_CONNECTIONS] = {0};
+static SemaphoreHandle_t pool_mutex;
 
 esp_err_t http_event_handler(esp_http_client_event_t *evt) {
   static char *output_buffer;
@@ -95,7 +100,7 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt) {
   return ESP_OK;
 }
 
-void post_data(http_queue_item_t *item) {
+static esp_http_client_handle_t create_connection(void) {
   esp_http_client_config_t config = {
       .url = "https://" HTTP_ENDPOINT HTTP_PATH,
       .event_handler = http_event_handler,
@@ -103,14 +108,64 @@ void post_data(http_queue_item_t *item) {
       .crt_bundle_attach = esp_crt_bundle_attach,
       .disable_auto_redirect = true,
       .timeout_ms = 5000,
+      .keep_alive_enable = true,
   };
 
-  esp_http_client_handle_t client = esp_http_client_init(&config);
+  return esp_http_client_init(&config);
+}
+
+void init_connection_pool(void) {
+  pool_mutex = xSemaphoreCreateMutex();
+
+  for (int i = 0; i < MAX_CONNECTIONS; i++) {
+    connection_pool[i].client = create_connection();
+    connection_pool[i].in_use = false;
+    connection_pool[i].last_used = 0;
+  }
+}
+
+static http_connection_t *get_connection(void) {
+  xSemaphoreTake(pool_mutex, portMAX_DELAY);
+
+  int64_t current_time = time(NULL) * 1000;
+  http_connection_t *selected_conn = NULL;
+
+  for (int i = 0; i < MAX_CONNECTIONS; i++) {
+    if (!connection_pool[i].in_use) {
+      if (current_time - connection_pool[i].last_used > CONNECTION_TIMEOUT_MS) {
+        esp_http_client_cleanup(connection_pool[i].client);
+        connection_pool[i].client = create_connection();
+      }
+      connection_pool[i].in_use = true;
+      connection_pool[i].last_used = current_time;
+      selected_conn = &connection_pool[i];
+      break;
+    }
+  }
+
+  xSemaphoreGive(pool_mutex);
+  return selected_conn;
+}
+
+static void release_connection(http_connection_t *conn) {
+  xSemaphoreTake(pool_mutex, portMAX_DELAY);
+  conn->in_use = false;
+  conn->last_used = time(NULL) * 1000;
+  xSemaphoreGive(pool_mutex);
+}
+
+void post_data() {
+  http_connection_t *conn = get_connection();
+  if (conn == NULL) {
+    ESP_LOGE(TAG, "Failed to get connection from pool");
+    return;
+  }
+
+  esp_http_client_handle_t client = conn->client;
 
   char post_data[64];
   snprintf(post_data, sizeof(post_data),
-           "{\"content\":\"I've been touched!!, timestamp :%lld\"}",
-           item->timestamp);
+           "{\"content\":\"I've been touched!!\"}");
 
   esp_http_client_set_method(client, HTTP_METHOD_POST);
   esp_http_client_set_header(client, "Content-Type", "application/json");
@@ -124,6 +179,7 @@ void post_data(http_queue_item_t *item) {
     }
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }
+
   if (err == ESP_OK) {
     ESP_LOGI(TAG, "HTTPS Status = %d, content_length = %" PRId64,
              esp_http_client_get_status_code(client),
@@ -131,7 +187,8 @@ void post_data(http_queue_item_t *item) {
   } else {
     ESP_LOGE(TAG, "Error perform http request %s", esp_err_to_name(err));
   }
-  esp_http_client_cleanup(client);
+
+  release_connection(conn);
 }
 
 static QueueHandle_t http_queue = NULL;
@@ -140,9 +197,9 @@ void http_task_handler(void *pvParameters) {
   http_queue_item_t item;
   while (1) {
     if (xQueueReceive(http_queue, &item, portMAX_DELAY) == pdTRUE) {
-      post_data(&item);
+      post_data();
     }
-    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
   }
 }
 
@@ -152,7 +209,9 @@ void http_queue_init(void) {
   xTaskCreate(http_task_handler, "http_task_handler", 4096, NULL, 5, NULL);
 }
 
-void http_task_send(http_queue_item_t *item) {
+void http_task_send(void) {
+  http_queue_item_t *item = {};
+
   if (xQueueSend(http_queue, item, 0) != pdTRUE) {
     ESP_LOGE(TAG, "Failed to send item to http queue");
   }

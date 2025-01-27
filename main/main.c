@@ -8,9 +8,7 @@
 #include "nvs_flash.h"
 #include "soc/gpio_num.h"
 #include "wifi.h"
-#include <string.h>
 #include <sys/param.h>
-#include <time.h>
 
 static adc_channel_t channel = ADC_CHANNEL_0;
 static adc_unit_t unit = ADC_UNIT_1;
@@ -34,6 +32,7 @@ void app_main(void) {
   wifi_init_sta();
   ESP_LOGI(TAG, "ESP_GPIO");
   gpio_init_led(led_gpio);
+  init_connection_pool();
   ESP_LOGI(TAG, "ESP_HTTP");
   http_queue_init();
 
@@ -53,11 +52,8 @@ void app_main(void) {
     if (raw != last_raw) {
       ESP_LOGI(TAG, "ADC[%d]: %d", channel, raw);
 
-      http_queue_item_t item = {
-          .timestamp = time(NULL),
-      };
+      http_task_send();
 
-      http_task_send(&item);
       last_raw = raw;
       vTaskDelay(pdMS_TO_TICKS(5000));
     }

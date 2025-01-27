@@ -5,7 +5,6 @@
 #include <time.h>
 
 typedef struct {
-  time_t timestamp;
 } http_queue_item_t;
 
 typedef struct {
@@ -15,6 +14,7 @@ typedef struct {
 } http_connection_t;
 
 void http_queue_init(void);
-void http_task_send(http_queue_item_t *item);
+void http_task_send(void);
+void init_connection_pool(void);
 
 #endif
