@@ -12,6 +12,7 @@ wip
 - [x] Connect to users wifi
 - [x] Read sensor data
 - [x] If sensor data has changed(i.e. the sensor has moved) push a notification to discord
+- [ ] REFACTOR
 - [ ] Blink LED while booting
 ### Beyond
 - [ ] Figure out certs so we can speed up the HTTPS

@@ -6,6 +6,7 @@
 #include "hal/adc_types.h"
 #include "http.h"
 #include "nvs_flash.h"
+#include "soc/gpio_num.h"
 #include "wifi.h"
 #include <string.h>
 #include <sys/param.h>
@@ -14,6 +15,7 @@
 static adc_channel_t channel = ADC_CHANNEL_0;
 static adc_unit_t unit = ADC_UNIT_1;
 static const char *TAG = "main STA";
+static gpio_num_t led_gpio = GPIO_NUM_25;
 
 void nvs_init(void) {
   esp_err_t ret = nvs_flash_init();
@@ -27,6 +29,9 @@ void nvs_init(void) {
 
 void app_main(void) {
   nvs_init();
+  configure_led(led_gpio);
+
+  blink_led(led_gpio);
 
   ESP_LOGI(TAG, "ESP_WIFI");
   wifi_init_sta();

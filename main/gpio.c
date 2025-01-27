@@ -1,5 +1,12 @@
 #include "gpio.h"
+#include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h" // IWYU pragma: keep
+#include "freertos/task.h"
+
+static const char *TAG = "GPIO";
+static uint8_t s_led_state = 0;
 
 adc_oneshot_unit_handle_t adc_oneshot(adc_unit_t unit, adc_channel_t channel) {
   adc_oneshot_unit_handle_t handle = NULL;
@@ -34,4 +41,20 @@ int read_adc(adc_unit_t unit, adc_channel_t channel) {
   adc_oneshot_unit_handle_t handle = adc_oneshot(unit, channel);
   int raw;
   return oneshot_read(handle, channel, &raw);
+}
+
+void blink_led(gpio_num_t gpio_num) {
+
+  while (1) {
+    gpio_set_level(gpio_num, s_led_state);
+    vTaskDelay(pdMS_TO_TICKS(50));
+    s_led_state = !s_led_state;
+  }
+}
+
+void configure_led(gpio_num_t gpio_num) {
+  ESP_LOGI(TAG, "Configuring LED on GPIO %d", gpio_num);
+  gpio_reset_pin(gpio_num);
+
+  gpio_set_direction(gpio_num, GPIO_MODE_OUTPUT);
 }
