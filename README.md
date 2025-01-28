@@ -65,9 +65,8 @@ idf.py -p PORT flash monitor
     - [ ] Change the notification settings
     - [ ] Change the push notification service
 - [ ] Document hardware wiring diagram
-- [ ] Add a license
-- [ ] Add a contributing guide
-- [ ] Add a code of conduct
+- [x] Add a license
+- [x] Add a code of conduct
 
 ### Future Goals
 - [ ] REFACTOR again probably
@@ -77,6 +76,7 @@ idf.py -p PORT flash monitor
 - [ ] Custom Enclosure
     - [ ] Add a battery
 - [ ] OTA firmware updates
+- [ ] Add a contributing guide
 
 ## License
 To be added (Suggested: MIT License).
