@@ -111,6 +111,7 @@ static esp_http_client_handle_t create_connection(void) {
       .keep_alive_enable = true,
   };
 
+  ESP_LOGI(TAG, "client created");
   return esp_http_client_init(&config);
 }
 
@@ -154,7 +155,7 @@ static void release_connection(http_connection_t *conn) {
   xSemaphoreGive(pool_mutex);
 }
 
-void post_data() {
+void post_data(char post_data[64]) {
   http_connection_t *conn = get_connection();
   if (conn == NULL) {
     ESP_LOGE(TAG, "Failed to get connection from pool");
@@ -162,10 +163,6 @@ void post_data() {
   }
 
   esp_http_client_handle_t client = conn->client;
-
-  char post_data[64];
-  snprintf(post_data, sizeof(post_data),
-           "{\"content\":\"I've been touched!!\"}");
 
   esp_http_client_set_method(client, HTTP_METHOD_POST);
   esp_http_client_set_header(client, "Content-Type", "application/json");
@@ -177,7 +174,7 @@ void post_data() {
     if (err != ESP_ERR_HTTP_EAGAIN) {
       break;
     }
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
   }
 
   if (err == ESP_OK) {
@@ -197,7 +194,10 @@ void http_task_handler(void *pvParameters) {
   http_queue_item_t item;
   while (1) {
     if (xQueueReceive(http_queue, &item, portMAX_DELAY) == pdTRUE) {
-      post_data();
+      char data[64];
+      snprintf(data, sizeof(data), "{\"content\":\"I've been touched!!\"}");
+
+      post_data(data);
     }
     vTaskDelay(5000 / portTICK_PERIOD_MS);
   }
@@ -206,6 +206,10 @@ void http_task_handler(void *pvParameters) {
 void http_queue_init(void) {
   http_queue = xQueueCreate(HTTP_QUEUE_SIZE, sizeof(http_queue_item_t));
 
+  char data[64];
+  snprintf(data, sizeof(data), "{\"content\":\"Sensor Initialized\"}");
+
+  post_data(data);
   xTaskCreate(http_task_handler, "http_task_handler", 4096, NULL, 5, NULL);
 }
 

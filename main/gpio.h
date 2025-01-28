@@ -1,10 +1,9 @@
 #ifndef GPIO_H
 #define GPIO_H
 #include "hal/adc_types.h"
-#include "soc/gpio_num.h"
 
-void blink_led(gpio_num_t gpio_num);
-void gpio_init_led(gpio_num_t gpio_num);
+void gpio_init_led(void);
+void stop_blink_led(void);
 
 typedef struct {
   int value;
@@ -14,5 +13,13 @@ typedef struct {
 } adc_config_t;
 
 int read_adc_filtered(adc_config_t *config);
+
+typedef struct {
+  adc_unit_t unit;
+  adc_channel_t channel;
+} gpio_queue_item_t;
+
+void gpio_queue_init(void);
+void add_sensor(adc_channel_t channel, adc_unit_t unit);
 
 #endif

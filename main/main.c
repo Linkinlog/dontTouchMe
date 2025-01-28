@@ -1,19 +1,18 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep
+#include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "gpio.h"
 #include "hal/adc_types.h"
 #include "http.h"
 #include "nvs_flash.h"
-#include "soc/gpio_num.h"
 #include "wifi.h"
 #include <sys/param.h>
 
 static adc_channel_t channel = ADC_CHANNEL_0;
 static adc_unit_t unit = ADC_UNIT_1;
 static const char *TAG = "main STA";
-static gpio_num_t led_gpio = GPIO_NUM_25;
 
 void nvs_init(void) {
   esp_err_t ret = nvs_flash_init();
@@ -26,37 +25,27 @@ void nvs_init(void) {
 }
 
 void app_main(void) {
+  ESP_LOGI(TAG, "ESP_LED");
+  gpio_init_led();
   ESP_LOGI(TAG, "ESP_NVS");
   nvs_init();
   ESP_LOGI(TAG, "ESP_WIFI");
   wifi_init_sta();
-  ESP_LOGI(TAG, "ESP_GPIO");
-  gpio_init_led(led_gpio);
+  ESP_LOGI(TAG, "ESP_POOL");
   init_connection_pool();
   ESP_LOGI(TAG, "ESP_HTTP");
   http_queue_init();
+  ESP_LOGI(TAG, "ESP_GPIO");
+  gpio_queue_init();
 
-  // blink_led(led_gpio);
+  add_sensor(channel, unit);
 
-  int last_raw = 0;
+  vTaskDelay(pdMS_TO_TICKS(500));
 
-  adc_config_t config = {
-      .value = 0,
-      .samples = 10,
-      .unit = unit,
-      .channel = channel,
-  };
+  ESP_LOGI(TAG, "ESP_SETUP_FINISH");
+  stop_blink_led();
 
   while (1) {
-    int raw = read_adc_filtered(&config);
-    if (raw != last_raw) {
-      ESP_LOGI(TAG, "ADC[%d]: %d", channel, raw);
-
-      http_task_send();
-
-      last_raw = raw;
-      vTaskDelay(pdMS_TO_TICKS(5000));
-    }
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(10000));
   }
 }

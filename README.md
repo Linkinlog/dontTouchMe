@@ -28,3 +28,4 @@ wip
 - [ ] Custom PCB
 - [ ] Custom Enclosure
     - [ ] Add a battery
+- [ ] Online updater
