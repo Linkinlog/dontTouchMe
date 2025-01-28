@@ -59,6 +59,7 @@ idf.py -p PORT flash monitor
 ## TODO
 ### High Priority
 - [ ] Improve WiFi reconnection logic
+- [ ] Add a button for disabling the sensor
 - [ ] Add web interface for configuration
     - [ ] View sensor data
     - [ ] Change the wifi network
@@ -79,7 +80,7 @@ idf.py -p PORT flash monitor
 - [ ] Add a contributing guide
 
 ## License
-To be added (Suggested: MIT License).
+Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contributing
 Contributions welcome! Please review the (upcoming) CONTRIBUTING.md guidelines.
