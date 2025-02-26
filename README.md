@@ -58,6 +58,7 @@ idf.py -p PORT flash monitor
 
 ## TODO
 ### High Priority
+- [ ] Add deep sleep as after a while our program stops
 - [ ] Improve WiFi reconnection logic
 - [ ] Add a button for disabling the sensor
 - [ ] Add web interface for configuration
